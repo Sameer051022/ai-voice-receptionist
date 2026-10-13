@@ -4,6 +4,12 @@ An AI voice receptionist for small businesses, built with **Vapi**, **n8n** and 
 
 Built for salons, clinics, academies, gyms and restaurants.
 
+## Demo
+
+[![AI Voice Receptionist workflow](Ai_Receptionist_Agent.jpg)](Glow_Salon_AI_Voice_Receptionist_Demo_v5.mp4)
+
+**[Watch the demo video](Glow_Salon_AI_Voice_Receptionist_Demo_v5.mp4)**: n8n flow walkthrough, a live call and the booking results.
+
 ## What it does
 
 - Answers business calls 24/7 as a natural conversation (no keypad menus)
@@ -65,10 +71,6 @@ Caller ──► Phone number ──► Vapi voice agent
 6. Add the business as a row in the Clients Registry and place a test call.
 
 > Never commit API keys, tokens or webhook secrets. Keep them in n8n credentials or environment variables.
-
-## Demo
-
-Want to see it in action? Reach out and I will share a demo.
 
 ## Author
 
