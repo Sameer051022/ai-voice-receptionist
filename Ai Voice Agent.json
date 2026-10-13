@@ -1,0 +1,1639 @@
+{
+  "name": "Ai Voice Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "get-services-pricing",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c4d86f56-6210-484a-8944-e5c8ada9f5ab",
+      "name": "Vapi Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        -48
+      ],
+      "webhookId": "c64c5054-6a0b-4a73-acf0-9649a180320c"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Vapi sends: body.message.toolCallList[0] = { id, function: { name, arguments } }\nconst body = $input.first().json.body || {};\nconst msg = body.message || {};\nconst calls = msg.toolCallList || msg.toolCalls || [];\nconst call = calls[0] || {};\nconst fn = call.function || {};\nlet args = fn.arguments || {};\nif (typeof args === 'string') { try { args = JSON.parse(args); } catch (e) { args = {}; } }\nconst q = $input.first().json.query || {};\nreturn [{ json: { toolCallId: call.id || 'test', name: fn.name || '', args, client: q.client || '',\n  assistantId: (msg.call && msg.call.assistantId) || (msg.assistant && msg.assistant.id) || '', phoneNumberId: (msg.call && msg.call.phoneNumberId) || '' } }];"
+      },
+      "id": "c19f1497-4b4b-4876-b005-597fbb36d0b2",
+      "name": "Parse Tool Call",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -496,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const C = $('Client (Pricing)').first().json;\n// One API call reads both tabs (faster than two Sheets nodes)\nfunction dur(v) {\n  const s = String(v ?? '').trim();\n  if (!/^\\d+$/.test(s)) return s;\n  const m = Number(s), h = Math.floor(m / 60), r = m % 60;\n  return [h ? h + (h === 1 ? ' hour' : ' hours') : '', r ? r + ' minutes' : ''].filter(Boolean).join(' ') || '0 minutes';\n}\nconst toolCallId = $('Parse Tool Call').first().json.toolCallId;\nconst vr = $('Read Sheet Tabs').first().json.valueRanges || [];\nconst rows = i => { const v = (vr[i] || {}).values || []; const [hdr = [], ...rest] = v; return rest.map(r => Object.fromEntries(hdr.map((k, j) => [k, r[j] ?? '']))); };\nconst services = rows(0).filter(r => r.service);\nconst packages = rows(1).filter(r => r.package);\nif (!services.length) {\n  return [{ json: { results: [{ toolCallId, result: 'PRICE LIST TEMPORARILY UNAVAILABLE. Apologise briefly, and offer to have the team call the customer back (use escalate_to_human).' }] } }];\n}\nconst s = services.map(r => `${r.service}: ${r.price_pkr} ${C.currency_word} (${dur(r.duration)})`).join('; ');\nconst p = packages.map(r => `${r.package} (${r.includes}): ${r.price_pkr} ${C.currency_word} (${dur(r.duration)})${r.notes ? ' - ' + r.notes : ''}`).join('; ');\nreturn [{ json: { results: [{ toolCallId, result: `SERVICES: ${s}. PACKAGES: ${p}. All prices are fixed, in ${C.currency_word} (${C.currency_code}). Never use any other currency.` }] } }];"
+      },
+      "id": "08600beb-41d0-42e1-bfa6-a56409e901d8",
+      "name": "Format For Vapi",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        -48
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "1fd1ccbd-8526-4b92-a461-e5e3ef7e8068",
+      "name": "Respond To Vapi",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        832,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "check-availability",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "b83a2e40-9288-4359-8310-5feb8c25cb78",
+      "name": "Availability Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        128
+      ],
+      "webhookId": "79f145cb-9cb3-4051-897c-da5f8bec3d1b"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Vapi sends: body.message.toolCallList[0] = { id, function: { name, arguments } }\nconst body = $input.first().json.body || {};\nconst msg = body.message || {};\nconst calls = msg.toolCallList || msg.toolCalls || [];\nconst call = calls[0] || {};\nconst fn = call.function || {};\nlet args = fn.arguments || {};\nif (typeof args === 'string') { try { args = JSON.parse(args); } catch (e) { args = {}; } }\nconst q = $input.first().json.query || {};\nreturn [{ json: { toolCallId: call.id || 'test', name: fn.name || '', args, client: q.client || '',\n  assistantId: (msg.call && msg.call.assistantId) || (msg.assistant && msg.assistant.id) || '', phoneNumberId: (msg.call && msg.call.phoneNumberId) || '' } }];"
+      },
+      "id": "6f963b04-0815-447d-832b-5e159dddf80a",
+      "name": "Parse Availability Call",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -544,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Client (Availability)').first().json.sheet_id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Settings",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "e6d23250-52a0-4ff6-b96f-c9eb207cf9cd",
+      "name": "Read Settings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        128,
+        128
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "m5CE0p2OCpQRSns3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Client (Availability)').first().json.sheet_id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Services",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "d942385a-d2a2-431e-9eaf-ac6fbcf5b89f",
+      "name": "Services For Availability",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        352,
+        128
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "m5CE0p2OCpQRSns3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Client (Availability)').first().json.sheet_id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Packages",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "fc51414f-ae33-4824-ac6c-0a1dfb15713f",
+      "name": "Packages For Availability",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        560,
+        128
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "m5CE0p2OCpQRSns3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "={{ $('Client (Availability)').first().json.calendar_id }}",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "timeMin": "={{ $('Parse Availability Call').first().json.args.date }}T00:00:00{{ $('Client (Availability)').first().json.offset }}",
+        "timeMax": "={{ $('Parse Availability Call').first().json.args.date }}T23:59:59{{ $('Client (Availability)').first().json.offset }}",
+        "options": {}
+      },
+      "id": "0be5d101-8cc0-4e80-ab54-7acf4fae9dc9",
+      "name": "Get Day Bookings",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        784,
+        128
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "x6l42Y3SAINHtji3",
+          "name": "Google Calendar account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const C = $('Client (Availability)').first().json;\nconst TZ = C.timezone;\nconst P = $('Parse Availability Call').first().json;\nconst args = P.args || {};\nconst toolCallId = P.toolCallId;\nconst reply = result => [{ json: { results: [{ toolCallId, result }] } }];\n\n// Settings tab -> { key: value }\nconst S = {};\n$('Read Settings').all().forEach(i => { if (i.json.key) S[String(i.json.key).trim()] = String(i.json.value ?? '').trim(); });\n\n// Helpers\nconst toMin = v => { const s = String(v ?? '').toLowerCase().trim(); if (/^\\d+$/.test(s)) return Number(s);\n  const h = s.match(/(\\d+)\\s*hour/), m = s.match(/(\\d+)\\s*min/); return ((h ? +h[1] * 60 : 0) + (m ? +m[1] : 0)) || 60; };\nconst words = min => { const h = Math.floor(min / 60), r = min % 60;\n  return [h ? h + (h === 1 ? ' hour' : ' hours') : '', r ? r + ' minutes' : ''].filter(Boolean).join(' '); };\nconst hm = t => { const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0); };\nconst fmt = min => { let h = Math.floor(min / 60); const m = min % 60, ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return `${h}:${String(m).padStart(2, '0')} ${ap}`; };\nconst pkMin = d => { const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false }).format(d).split(':'); return (+h % 24) * 60 + (+m); };\n\n// 1. Date checks\nconst date = String(args.date || '').trim();\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return reply('Date missing. Ask the customer which day, then call again with date as YYYY-MM-DD.');\nconst today = new Date().toLocaleDateString('en-CA', { timeZone: TZ });\nif (date < today) return reply(`${date} is in the past. Ask the customer for a future date.`);\nconst weekday = new Date(date + 'T12:00:00' + C.offset).toLocaleDateString('en-US', { weekday: 'long', timeZone: TZ });\nconst openDays = (S.open_days || '').split(',').map(d => d.trim().slice(0, 3).toLowerCase());\nif (!openDays.includes(weekday.slice(0, 3).toLowerCase())) return reply(`The salon is closed on ${weekday}, ${date}. Open days: ${S.open_days}. Suggest another day.`);\n\n// 2. Service duration\nconst want = String(args.service || '').toLowerCase().trim();\nconst all = [...$('Services For Availability').all().map(i => ({ name: i.json.service, d: i.json.duration })),\n             ...$('Packages For Availability').all().map(i => ({ name: i.json.package, d: i.json.duration }))].filter(x => x.name);\nconst findItem = (list, raw) => { const k = s => String(s || '').toLowerCase().replace(/\\(.*?\\)/g, ' ').replace(/[^a-z0-9+]/g, ''); const w = k(raw); if (!w) return null; const by = f => list.filter(x => f(k(x.name))); return by(n => n === w)[0] || by(n => w.startsWith(n)).sort((a, b) => k(b.name).length - k(a.name).length)[0] || by(n => n.includes(w)).sort((a, b) => k(a.name).length - k(b.name).length)[0] || by(n => w.includes(n)).sort((a, b) => k(b.name).length - k(a.name).length)[0] || null; };\nconst match = want ? findItem(all, args.service) : null;\nconst dur = match ? toMin(match.d) : 60;\nconst label = match ? match.name : 'The appointment';\nconst note = want && !match ? ` (service \"${args.service}\" not found in the list, assumed 1 hour)` : '';\n\n// 3. Opening hours, capacity, existing bookings\nconst open = hm(S.open_time || '11:00'), close = hm(S.close_time || '21:00');\nconst maxPar = Number(S.max_parallel_bookings) || 1;\nconst events = $('Get Day Bookings').all().map(i => i.json)\n  .filter(e => e.start && e.start.dateTime && e.status !== 'cancelled')\n  .map(e => ({ s: pkMin(new Date(e.start.dateTime)), e: pkMin(new Date(e.end.dateTime)) }));\nconst earliest = date === today ? pkMin(new Date()) + 30 : 0; // 30 min buffer for same-day\nconst isFree = st => st >= open && st + dur <= close && st >= earliest &&\n  events.filter(ev => st < ev.e && st + dur > ev.s).length < maxPar;\n\nconst slots = [];\nfor (let t = open; t + dur <= close; t += 30) if (isFree(t)) slots.push(t);\nconst hours = `Open ${fmt(open)} to ${fmt(close)}.`;\n\n// 4. Answer\nif (args.time) {\n  const t = hm(args.time);\n  if (isFree(t)) return reply(`AVAILABLE: ${label} on ${weekday}, ${date} at ${fmt(t)} is free (takes ${words(dur)})${note}.`);\n  const why = (t < open || t + dur > close) ? `outside business hours, ${fmt(open)} to ${fmt(close)}` : (t < earliest ? 'too soon or already passed' : 'already booked');\n  if (!slots.length) return reply(`NOT AVAILABLE: ${date} is fully booked for ${label}${note}. Suggest another day.`);\n  const near = [...slots].sort((a, b) => Math.abs(a - t) - Math.abs(b - t)).slice(0, 3).sort((a, b) => a - b);\n  return reply(`NOT AVAILABLE at ${fmt(t)} on ${weekday}, ${date} (${why}). Nearest free times for ${label}: ${near.map(fmt).join(', ')}${note}.`);\n}\nif (!slots.length) return reply(`${weekday}, ${date} is fully booked for ${label}${note}. Suggest another day.`);\nconst shown = slots.length > 8 ? slots.filter((_, i) => i % Math.ceil(slots.length / 8) === 0) : slots;\nreturn reply(`Free start times on ${weekday}, ${date} for ${label} (takes ${words(dur)}): ${shown.map(fmt).join(', ')}. ${hours}${note}`);\n"
+      },
+      "id": "69ee9bca-d37f-494f-a477-281ad536f938",
+      "name": "Compute Slots",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        128
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "6ccac1bc-ba9b-4780-b1c8-94e91603d310",
+      "name": "Respond Availability",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1232,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "book-appointment",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "4f6d8da4-1bc7-413d-b7d4-1482eb46fffb",
+      "name": "Booking Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        304
+      ],
+      "webhookId": "d109837e-822a-4b48-8e44-e25c00afd3ca"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Vapi sends: body.message.toolCallList[0] = { id, function: { name, arguments } }\nconst body = $input.first().json.body || {};\nconst msg = body.message || {};\nconst calls = msg.toolCallList || msg.toolCalls || [];\nconst call = calls[0] || {};\nconst fn = call.function || {};\nlet args = fn.arguments || {};\nif (typeof args === 'string') { try { args = JSON.parse(args); } catch (e) { args = {}; } }\nconst q = $input.first().json.query || {};\nreturn [{ json: { toolCallId: call.id || 'test', name: fn.name || '', args, client: q.client || '',\n  assistantId: (msg.call && msg.call.assistantId) || (msg.assistant && msg.assistant.id) || '', phoneNumberId: (msg.call && msg.call.phoneNumberId) || '' } }];"
+      },
+      "id": "daf802d5-161a-4d3e-903d-868685e3eae1",
+      "name": "Parse Booking Call",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -528,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Client (Booking)').first().json.sheet_id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Settings",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "48c05c72-e272-4ec4-8030-9065481fc61f",
+      "name": "Booking Settings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        144,
+        304
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "m5CE0p2OCpQRSns3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Client (Booking)').first().json.sheet_id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Services",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "7f538358-0ba3-4346-b1ab-579388b376e8",
+      "name": "Booking Services",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        368,
+        304
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "m5CE0p2OCpQRSns3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Client (Booking)').first().json.sheet_id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Packages",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "e4879b3c-318b-45bf-bf4b-5648fe169636",
+      "name": "Booking Packages",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        576,
+        304
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "m5CE0p2OCpQRSns3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "={{ $('Client (Booking)').first().json.calendar_id }}",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "timeMin": "={{ $('Parse Booking Call').first().json.args.date }}T00:00:00{{ $('Client (Booking)').first().json.offset }}",
+        "timeMax": "={{ $('Parse Booking Call').first().json.args.date }}T23:59:59{{ $('Client (Booking)').first().json.offset }}",
+        "options": {}
+      },
+      "id": "d8759483-06b8-4c3d-989a-3a6bed6fbcda",
+      "name": "Booking Day Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        800,
+        304
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "x6l42Y3SAINHtji3",
+          "name": "Google Calendar account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const C = $('Client (Booking)').first().json;\nconst TZ = C.timezone;\nconst P = $('Parse Booking Call').first().json;\nconst args = P.args || {};\nconst no = result => [{ json: { ok: false, result } }];\n\n// Settings tab -> { key: value }\nconst S = {};\n$('Booking Settings').all().forEach(i => { if (i.json.key) S[String(i.json.key).trim()] = String(i.json.value ?? '').trim(); });\n\n// Helpers\nconst toMin = v => { const s = String(v ?? '').toLowerCase().trim(); if (/^\\d+$/.test(s)) return Number(s);\n  const h = s.match(/(\\d+)\\s*hour/), m = s.match(/(\\d+)\\s*min/); return ((h ? +h[1] * 60 : 0) + (m ? +m[1] : 0)) || 60; };\nconst words = min => { const h = Math.floor(min / 60), r = min % 60;\n  return [h ? h + (h === 1 ? ' hour' : ' hours') : '', r ? r + ' minutes' : ''].filter(Boolean).join(' '); };\nconst hm = t => { const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0); };\nconst fmt = min => { let h = Math.floor(min / 60); const m = min % 60, ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return `${h}:${String(m).padStart(2, '0')} ${ap}`; };\nconst hhmm = min => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;\nconst pkMin = d => { const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false }).format(d).split(':'); return (+h % 24) * 60 + (+m); };\n\n// 1. Required details\nconst name = String(args.name || '').trim();\nlet phone = String(args.phone || '').replace(/\\D/g, '');\nif (phone.startsWith('0')) phone = C.country_code + phone.slice(1);       // 03001234567 -> 923001234567\nif (C.country_code === '92' && phone.length === 10 && phone.startsWith('3')) phone = '92' + phone;\nconst service = String(args.service || '').trim();\nconst date = String(args.date || '').trim();\nconst time = String(args.time || '').trim();\nconst missing = [];\nif (!name) missing.push('customer name');\nif (phone.length < 11) missing.push('valid phone number');\nif (!service) missing.push('service');\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) missing.push('date');\nif (!/^\\d{1,2}:\\d{2}$/.test(time)) missing.push('time');\nif (missing.length) return no(`NOT BOOKED: missing ${missing.join(', ')}. Ask the customer, then call book_appointment again.`);\n\n// 2. Day checks\nconst today = new Date().toLocaleDateString('en-CA', { timeZone: TZ });\nif (date < today) return no(`NOT BOOKED: ${date} is in the past. Ask for a future date.`);\nconst weekday = new Date(date + 'T12:00:00' + C.offset).toLocaleDateString('en-US', { weekday: 'long', timeZone: TZ });\nconst openDays = (S.open_days || '').split(',').map(d => d.trim().slice(0, 3).toLowerCase());\nif (!openDays.includes(weekday.slice(0, 3).toLowerCase())) return no(`NOT BOOKED: the salon is closed on ${weekday}. Open days: ${S.open_days}.`);\n\n// 3. Service lookup (name, duration, price)\nconst want = service.toLowerCase();\nconst all = [...$('Booking Services').all().map(i => ({ name: i.json.service, d: i.json.duration, p: i.json.price_pkr })),\n             ...$('Booking Packages').all().map(i => ({ name: i.json.package, d: i.json.duration, p: i.json.price_pkr }))].filter(x => x.name);\nconst findItem = (list, raw) => { const k = s => String(s || '').toLowerCase().replace(/\\(.*?\\)/g, ' ').replace(/[^a-z0-9+]/g, ''); const w = k(raw); if (!w) return null; const by = f => list.filter(x => f(k(x.name))); return by(n => n === w)[0] || by(n => w.startsWith(n)).sort((a, b) => k(b.name).length - k(a.name).length)[0] || by(n => n.includes(w)).sort((a, b) => k(a.name).length - k(b.name).length)[0] || by(n => w.includes(n)).sort((a, b) => k(b.name).length - k(a.name).length)[0] || null; };\nconst match = findItem(all, service);\nif (!match) return no(`NOT BOOKED: \"${service}\" is not in our service list. Offer the customer the correct service name first.`);\nconst dur = toMin(match.d);\n\n// 4. Re-check the slot (someone may have booked it moments ago)\nconst open = hm(S.open_time || '11:00'), close = hm(S.close_time || '21:00');\nconst maxPar = Number(S.max_parallel_bookings) || 1;\nconst events = $('Booking Day Events').all().map(i => i.json)\n  .filter(e => e.start && e.start.dateTime && e.status !== 'cancelled')\n  .map(e => ({ s: pkMin(new Date(e.start.dateTime)), e: pkMin(new Date(e.end.dateTime)) }));\nconst earliest = date === today ? pkMin(new Date()) + 30 : 0;\nconst isFree = st => st >= open && st + dur <= close && st >= earliest &&\n  events.filter(ev => st < ev.e && st + dur > ev.s).length < maxPar;\nconst t = hm(time);\nif (!isFree(t)) {\n  const slots = []; for (let x = open; x + dur <= close; x += 30) if (isFree(x)) slots.push(x);\n  const near = slots.sort((a, b) => Math.abs(a - t) - Math.abs(b - t)).slice(0, 3).sort((a, b) => a - b);\n  return no(`NOT BOOKED: ${fmt(t)} on ${weekday} is not available for ${match.name}.` +\n    (near.length ? ` Nearest free times: ${near.map(fmt).join(', ')}.` : ' That day is fully booked, suggest another day.'));\n}\n\n// 5. Everything OK -> build booking\nconst bookingId = 'BK-' + date.slice(5).replace('-', '') + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();\nconst nice = new Date(date + 'T12:00:00' + C.offset).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: TZ });\nconst ownerMsg = [\n  `✅ New Booking - ${S.business_name || 'Salon'}`,\n  `Name: ${name}`, `Phone: +${phone}`,\n  `Service: ${match.name} (${words(dur)})`, `Price: ${C.currency_code} ${match.p}`,\n  `Date: ${weekday}, ${nice}`, `Time: ${fmt(t)}`,\n  `Booking ID: ${bookingId}`, args.notes ? `Notes: ${args.notes}` : ''\n].filter(Boolean).join('\\n');\n\nreturn [{ json: {\n  ok: true,\n  bookingId, name, phone: '+' + phone, service: match.name, price: match.p, durationText: words(dur),\n  date, time: hhmm(t), timeText: fmt(t), weekday,\n  start: `${date}T${hhmm(t)}:00${C.offset}`, end: `${date}T${hhmm(t + dur)}:00${C.offset}`,\n  notes: args.notes || '', ownerWhatsapp: String(S.owner_whatsapp || '').replace(/\\D/g, ''),\n  callmebotKey: S.callmebot_apikey || '', ownerMsg,\n  ownerEmail: S.owner_email || '',\n  waPhoneId: String(S.wa_phone_number_id || '').replace(/\\D/g, ''),\n  businessName: S.business_name || 'Salon',\n  dateText: `${weekday}, ${nice}`,\n  result: `BOOKED: ${match.name} for ${name} on ${weekday}, ${nice} at ${fmt(t)} (${words(dur)}, ${match.p} ${C.currency_word}). Booking ID ${bookingId}. Confirm these details to the customer.`\n} }];\n"
+      },
+      "id": "19928b33-5b4a-4d32-b463-408b5be80ea5",
+      "name": "Validate Booking",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        304
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "7478b3f2-45e1-4718-ae02-f60d388bcf70",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e5a0d706-27e4-40bb-a3ec-9b92a7f13541",
+      "name": "Slot OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "={{ $('Client (Booking)').first().json.calendar_id }}",
+          "mode": "id"
+        },
+        "start": "={{ $json.start }}",
+        "end": "={{ $json.end }}",
+        "additionalFields": {
+          "description": "=Booking ID: {{ $json.bookingId }}\nPhone: {{ $json.phone }}\nService: {{ $json.service }} ({{ $json.durationText }})\nPrice: {{ $('Client (Booking)').first().json.currency_code }} {{ $json.price }}\nBooked by: AI receptionist (call)\nNotes: {{ $json.notes }}",
+          "summary": "={{ $json.service }} - {{ $json.name }}"
+        }
+      },
+      "id": "5226f5ae-6e14-48be-8e20-ac0b2002fcdb",
+      "name": "Create Calendar Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1456,
+        208
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "x6l42Y3SAINHtji3",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const v = $('Validate Booking').first().json;\nreturn [{ json: {\n  booking_id: v.bookingId,\n  timestamp: new Date().toLocaleString('en-GB', { timeZone: $('Client (Booking)').first().json.timezone }),\n  name: v.name, phone: v.phone, service: v.service,\n  date: v.date, time: v.timeText,\n  channel: 'call', status: 'confirmed',\n  calendar_event_id: $json.id || '',\n  call_summary: v.notes\n} }];"
+      },
+      "id": "0e750a7c-f860-406d-ac7f-1f22273585fe",
+      "name": "Build Booking Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Client (Booking)').first().json.sheet_id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Bookings",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "9f5476c2-7b94-44cf-9a4f-d3f0a5d13250",
+      "name": "Save To Bookings Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1904,
+        208
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "m5CE0p2OCpQRSns3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { results: [{ toolCallId: $('Parse Booking Call').first().json.toolCallId, result: $('Validate Booking').first().json.result }] } }}",
+        "options": {}
+      },
+      "id": "d0d92bf3-a15f-4e78-a6e6-a11b7f6579be",
+      "name": "Respond Booked",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2112,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v23.0/{{ $('Validate Booking').first().json.waPhoneId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $('Validate Booking').first().json.ownerWhatsapp, type: 'text', text: { body: $('Validate Booking').first().json.ownerMsg } }) }}",
+        "options": {}
+      },
+      "id": "7c46b3b6-7387-4583-abfe-1c751fd044c7",
+      "name": "WhatsApp Owner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2320,
+        208
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vyYjyaCvarcaPd7c",
+          "name": "WhatsApp Cloud API"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "TEST MODE: sends plain text (works only within 24h after the owner messages the test number). Template version for production: ={{ JSON.stringify({ messaging_product: 'whatsapp', to: $('Validate Booking').first().json.ownerWhatsapp, type: 'template', template: { name: 'new_booking_alert', language: { code: 'en' }, components: [{ type: 'body', parameters: [$('Validate Booking').first().json.businessName, $('Validate Booking').first().json.name, $('Validate Booking').first().json.phone, $('Validate Booking').first().json.service + ' (' + $('Validate Booking').first().json.durationText + ') - PKR ' + $('Validate Booking').first().json.price, $('Validate Booking').first().json.dateText, $('Validate Booking').first().json.timeText, $('Validate Booking').first().json.bookingId].map(t => ({ type: 'text', text: String(t) })) }] } }) }}"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { results: [{ toolCallId: $('Parse Booking Call').first().json.toolCallId, result: $('Validate Booking').first().json.result }] } }}",
+        "options": {}
+      },
+      "id": "9b995b3f-d9f6-466b-85d9-f74919f15d26",
+      "name": "Respond Not Booked",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1456,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Validate Booking').first().json.ownerEmail }}",
+        "subject": "=New Booking: {{ $('Validate Booking').first().json.service }} - {{ $('Validate Booking').first().json.name }} ({{ $('Validate Booking').first().json.weekday }}, {{ $('Validate Booking').first().json.timeText }})",
+        "emailType": "text",
+        "message": "={{ $('Validate Booking').first().json.ownerMsg }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "d2d8e669-68b8-4a2f-a965-927ef153707b",
+      "name": "Email Owner",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2320,
+        32
+      ],
+      "webhookId": "d2a58f79-4a19-442e-b622-c4205fc0462c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "0tMB9pp8maOyBnTp",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "escalate-to-human",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "6682d89d-b5e7-4c88-b0f6-36276a79b883",
+      "name": "Escalation Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -704,
+        624
+      ],
+      "webhookId": "5ac0c2ec-782a-4ac5-aa3d-12990192cd50"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Vapi sends: body.message.toolCallList[0] = { id, function: { name, arguments } }\nconst body = $input.first().json.body || {};\nconst msg = body.message || {};\nconst calls = msg.toolCallList || msg.toolCalls || [];\nconst call = calls[0] || {};\nconst fn = call.function || {};\nlet args = fn.arguments || {};\nif (typeof args === 'string') { try { args = JSON.parse(args); } catch (e) { args = {}; } }\nconst q = $input.first().json.query || {};\nreturn [{ json: { toolCallId: call.id || 'test', name: fn.name || '', args, client: q.client || '',\n  assistantId: (msg.call && msg.call.assistantId) || (msg.assistant && msg.assistant.id) || '', phoneNumberId: (msg.call && msg.call.phoneNumberId) || '' } }];"
+      },
+      "id": "61057715-89a7-4888-9dd6-16e56ee4fd2d",
+      "name": "Parse Escalation Call",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -512,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Client (Escalation)').first().json.sheet_id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Settings",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "3801efd4-7132-4e6d-9266-5c229818fddc",
+      "name": "Escalation Settings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        160,
+        624
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "m5CE0p2OCpQRSns3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const C = $('Client (Escalation)').first().json;\nconst P = $('Parse Escalation Call').first().json;\nconst a = P.args || {};\nconst S = {};\n$('Escalation Settings').all().forEach(i => { if (i.json.key) S[String(i.json.key).trim()] = String(i.json.value ?? '').trim(); });\n\nlet phone = String(a.phone || '').replace(/\\D/g, '');\nif (phone.startsWith('0')) phone = C.country_code + phone.slice(1);\nif (C.country_code === '92' && phone.length === 10 && phone.startsWith('3')) phone = '92' + phone;\nconst phoneText = phone.length >= 11 ? '+' + phone : 'not given (check call log)';\nconst name = String(a.name || '').trim() || 'Unknown caller';\nconst reason = String(a.reason || 'Customer asked to speak to a person').trim();\nconst details = String(a.details || '').trim();\n\nconst now = new Date();\nconst id = 'CB-' + now.toLocaleDateString('en-CA', { timeZone: C.timezone }).slice(5).replace('-', '') + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();\nconst when = now.toLocaleString('en-GB', { timeZone: C.timezone, dateStyle: 'medium', timeStyle: 'short' });\n\nconst ownerMsg = [\n  `📞 Callback needed - ${S.business_name || 'Salon'}`,\n  `Name: ${name}`, `Phone: ${phoneText}`,\n  `Reason: ${reason}`, details ? `Details: ${details}` : '',\n  `Time: ${when}`, `Ref: ${id}`,\n  `Please call the customer back as soon as possible.`\n].filter(Boolean).join('\\n');\n\nreturn [{ json: {\n  id, name, phone: phoneText, reason, details, ownerMsg,\n  ownerWhatsapp: String(S.owner_whatsapp || '').replace(/\\D/g, ''),\n  ownerEmail: S.owner_email || '',\n  waPhoneId: String(S.wa_phone_number_id || '').replace(/\\D/g, ''),\n  businessName: S.business_name || 'Salon',\n  row: { booking_id: id, timestamp: now.toLocaleString('en-GB', { timeZone: C.timezone }), name, phone: phoneText,\n         service: details, date: '', time: '', channel: 'call', status: 'callback_requested', calendar_event_id: '', call_summary: reason },\n  result: `ESCALATED: The owner has been alerted (reason: ${reason}). Tell the customer politely that a team member will call them back shortly${phone.length >= 11 ? ' on ' + phoneText : ''}. Reference ${id}.`\n} }];\n"
+      },
+      "id": "65782d9a-0ad2-4ec9-b65d-d9173c1fcc89",
+      "name": "Build Escalation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        624
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { results: [{ toolCallId: $('Parse Escalation Call').first().json.toolCallId, result: $('Build Escalation').first().json.result }] } }}",
+        "options": {}
+      },
+      "id": "39045286-222d-4a3d-a9bb-3784887e7023",
+      "name": "Respond Escalation",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        592,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $('Build Escalation').first().json.row }];"
+      },
+      "id": "0e825cce-48b6-42bf-9f59-f4a4d5a976d4",
+      "name": "Escalation Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Client (Escalation)').first().json.sheet_id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Bookings",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "booking_id",
+              "displayName": "booking_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "service",
+              "displayName": "service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "calendar_event_id",
+              "displayName": "calendar_event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "call_summary",
+              "displayName": "call_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "e48d1b42-7983-4e7a-acbb-c747053e4f97",
+      "name": "Log Callback Request",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1072,
+        480
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "m5CE0p2OCpQRSns3",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v23.0/{{ $('Build Escalation').first().json.waPhoneId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $('Build Escalation').first().json.ownerWhatsapp, type: 'text', text: { body: $('Build Escalation').first().json.ownerMsg } }) }}",
+        "options": {}
+      },
+      "id": "081ac496-099f-4927-a025-f120cec8311c",
+      "name": "WhatsApp Callback Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        832,
+        624
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vyYjyaCvarcaPd7c",
+          "name": "WhatsApp Cloud API"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "TEST MODE: plain text (needs owner message within 24h). Switch to an approved template for production."
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Build Escalation').first().json.ownerEmail }}",
+        "subject": "=Callback needed: {{ $('Build Escalation').first().json.name }} - {{ $('Build Escalation').first().json.reason }}",
+        "emailType": "text",
+        "message": "={{ $('Build Escalation').first().json.ownerMsg }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "26cca9f8-a9b6-4fef-96e2-41d74da38ea0",
+      "name": "Email Callback Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        832,
+        784
+      ],
+      "webhookId": "6cc00efc-677e-4152-ba9f-74374b25f74b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "0tMB9pp8maOyBnTp",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Client (Pricing)').first().json.sheet_id }}/values:batchGet?ranges=Services&ranges=Packages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {
+          "timeout": 8000
+        }
+      },
+      "id": "2943a5af-8dc6-4a07-b24f-ea192f9150d2",
+      "name": "Read Sheet Tabs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        176,
+        -48
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "m5CE0p2OCpQRSns3",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://sheets.googleapis.com/v4/spreadsheets/1n5c7sFW9udP-l-4AzvKtDzN8Qon4RHcYPvKDUFrGRK0/values/Clients",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {
+          "timeout": 8000
+        }
+      },
+      "id": "25cd50c0-ccb8-4ae4-93f6-f99f38485196",
+      "name": "Load Clients (Pricing)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -272,
+        -48
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "m5CE0p2OCpQRSns3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const P = $('Parse Tool Call').first().json;\nconst vals = $input.first().json.values || [];\nconst [hdr = [], ...rows] = vals;\nconst list = rows.map(r => Object.fromEntries(hdr.map((k, j) => [String(k).trim(), String(r[j] ?? '').trim()])))\n  .filter(c => c.client_id && String(c.active || 'yes').toLowerCase() !== 'no');\nconst has = (f, v) => !!v && String(f || '').split(',').map(s => s.trim()).includes(v);\n// Which client is this call for? 1) ?client= in tool URL  2) phone number id  3) Vapi assistant id  4) first client\nconst c = list.find(x => P.client && x.client_id === P.client) || list.find(x => has(x.phone_number_ids, P.phoneNumberId))\n  || list.find(x => has(x.vapi_assistant_ids, P.assistantId)) || list[0];\nif (!c) throw new Error('No active client in the Clients registry');\nconst tz = c.timezone || 'Asia/Karachi';\nconst today = new Date().toLocaleDateString('en-CA', { timeZone: tz });\nconst date = /^\\d{4}-\\d{2}-\\d{2}$/.test(String((P.args || {}).date || '')) ? P.args.date : today;\nconst d0 = new Date(date + 'T12:00:00Z');\nconst p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(d0).map(x => [x.type, x.value]));\nconst mins = Math.round((Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute) - d0.getTime()) / 60000);\nconst offset = (mins >= 0 ? '+' : '-') + String(Math.floor(Math.abs(mins) / 60)).padStart(2, '0') + ':' + String(Math.abs(mins) % 60).padStart(2, '0');\nreturn [{ json: { ...c, timezone: tz, offset, today, country_code: c.country_code || '92', currency_code: c.currency_code || 'PKR', currency_word: c.currency_word || 'rupees' } }];"
+      },
+      "id": "ca3c0d9f-c44b-474e-a2eb-4d6c9ea4c447",
+      "name": "Client (Pricing)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -64,
+        -48
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "url": "https://sheets.googleapis.com/v4/spreadsheets/1n5c7sFW9udP-l-4AzvKtDzN8Qon4RHcYPvKDUFrGRK0/values/Clients",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {
+          "timeout": 8000
+        }
+      },
+      "id": "d479dd39-2729-4b0b-9214-c9a6acf63174",
+      "name": "Load Clients (Availability)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -320,
+        128
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "m5CE0p2OCpQRSns3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const P = $('Parse Availability Call').first().json;\nconst vals = $input.first().json.values || [];\nconst [hdr = [], ...rows] = vals;\nconst list = rows.map(r => Object.fromEntries(hdr.map((k, j) => [String(k).trim(), String(r[j] ?? '').trim()])))\n  .filter(c => c.client_id && String(c.active || 'yes').toLowerCase() !== 'no');\nconst has = (f, v) => !!v && String(f || '').split(',').map(s => s.trim()).includes(v);\n// Which client is this call for? 1) ?client= in tool URL  2) phone number id  3) Vapi assistant id  4) first client\nconst c = list.find(x => P.client && x.client_id === P.client) || list.find(x => has(x.phone_number_ids, P.phoneNumberId))\n  || list.find(x => has(x.vapi_assistant_ids, P.assistantId)) || list[0];\nif (!c) throw new Error('No active client in the Clients registry');\nconst tz = c.timezone || 'Asia/Karachi';\nconst today = new Date().toLocaleDateString('en-CA', { timeZone: tz });\nconst date = /^\\d{4}-\\d{2}-\\d{2}$/.test(String((P.args || {}).date || '')) ? P.args.date : today;\nconst d0 = new Date(date + 'T12:00:00Z');\nconst p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(d0).map(x => [x.type, x.value]));\nconst mins = Math.round((Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute) - d0.getTime()) / 60000);\nconst offset = (mins >= 0 ? '+' : '-') + String(Math.floor(Math.abs(mins) / 60)).padStart(2, '0') + ':' + String(Math.abs(mins) % 60).padStart(2, '0');\nreturn [{ json: { ...c, timezone: tz, offset, today, country_code: c.country_code || '92', currency_code: c.currency_code || 'PKR', currency_word: c.currency_word || 'rupees' } }];"
+      },
+      "id": "a24f5585-336e-48a2-8aad-2b1aeb7799fc",
+      "name": "Client (Availability)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        128
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "url": "https://sheets.googleapis.com/v4/spreadsheets/1n5c7sFW9udP-l-4AzvKtDzN8Qon4RHcYPvKDUFrGRK0/values/Clients",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {
+          "timeout": 8000
+        }
+      },
+      "id": "5cc3bb70-b695-4cc3-bfe2-1e5c2b48d275",
+      "name": "Load Clients (Booking)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -304,
+        304
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "m5CE0p2OCpQRSns3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const P = $('Parse Booking Call').first().json;\nconst vals = $input.first().json.values || [];\nconst [hdr = [], ...rows] = vals;\nconst list = rows.map(r => Object.fromEntries(hdr.map((k, j) => [String(k).trim(), String(r[j] ?? '').trim()])))\n  .filter(c => c.client_id && String(c.active || 'yes').toLowerCase() !== 'no');\nconst has = (f, v) => !!v && String(f || '').split(',').map(s => s.trim()).includes(v);\n// Which client is this call for? 1) ?client= in tool URL  2) phone number id  3) Vapi assistant id  4) first client\nconst c = list.find(x => P.client && x.client_id === P.client) || list.find(x => has(x.phone_number_ids, P.phoneNumberId))\n  || list.find(x => has(x.vapi_assistant_ids, P.assistantId)) || list[0];\nif (!c) throw new Error('No active client in the Clients registry');\nconst tz = c.timezone || 'Asia/Karachi';\nconst today = new Date().toLocaleDateString('en-CA', { timeZone: tz });\nconst date = /^\\d{4}-\\d{2}-\\d{2}$/.test(String((P.args || {}).date || '')) ? P.args.date : today;\nconst d0 = new Date(date + 'T12:00:00Z');\nconst p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(d0).map(x => [x.type, x.value]));\nconst mins = Math.round((Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute) - d0.getTime()) / 60000);\nconst offset = (mins >= 0 ? '+' : '-') + String(Math.floor(Math.abs(mins) / 60)).padStart(2, '0') + ':' + String(Math.abs(mins) % 60).padStart(2, '0');\nreturn [{ json: { ...c, timezone: tz, offset, today, country_code: c.country_code || '92', currency_code: c.currency_code || 'PKR', currency_word: c.currency_word || 'rupees' } }];"
+      },
+      "id": "8c9e9566-1af6-4384-a854-cbee4d0a3e6f",
+      "name": "Client (Booking)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        304
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "url": "https://sheets.googleapis.com/v4/spreadsheets/1n5c7sFW9udP-l-4AzvKtDzN8Qon4RHcYPvKDUFrGRK0/values/Clients",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {
+          "timeout": 8000
+        }
+      },
+      "id": "8a2e5067-693a-49d4-95f5-48343c90cb94",
+      "name": "Load Clients (Escalation)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -288,
+        624
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "m5CE0p2OCpQRSns3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const P = $('Parse Escalation Call').first().json;\nconst vals = $input.first().json.values || [];\nconst [hdr = [], ...rows] = vals;\nconst list = rows.map(r => Object.fromEntries(hdr.map((k, j) => [String(k).trim(), String(r[j] ?? '').trim()])))\n  .filter(c => c.client_id && String(c.active || 'yes').toLowerCase() !== 'no');\nconst has = (f, v) => !!v && String(f || '').split(',').map(s => s.trim()).includes(v);\n// Which client is this call for? 1) ?client= in tool URL  2) phone number id  3) Vapi assistant id  4) first client\nconst c = list.find(x => P.client && x.client_id === P.client) || list.find(x => has(x.phone_number_ids, P.phoneNumberId))\n  || list.find(x => has(x.vapi_assistant_ids, P.assistantId)) || list[0];\nif (!c) throw new Error('No active client in the Clients registry');\nconst tz = c.timezone || 'Asia/Karachi';\nconst today = new Date().toLocaleDateString('en-CA', { timeZone: tz });\nconst date = /^\\d{4}-\\d{2}-\\d{2}$/.test(String((P.args || {}).date || '')) ? P.args.date : today;\nconst d0 = new Date(date + 'T12:00:00Z');\nconst p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(d0).map(x => [x.type, x.value]));\nconst mins = Math.round((Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute) - d0.getTime()) / 60000);\nconst offset = (mins >= 0 ? '+' : '-') + String(Math.floor(Math.abs(mins) / 60)).padStart(2, '0') + ':' + String(Math.abs(mins) % 60).padStart(2, '0');\nreturn [{ json: { ...c, timezone: tz, offset, today, country_code: c.country_code || '92', currency_code: c.currency_code || 'PKR', currency_word: c.currency_word || 'rupees' } }];"
+      },
+      "id": "bb8302f8-66a4-4cdf-88cd-4d484d1249f5",
+      "name": "Client (Escalation)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        624
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vapi-assistant-request",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "66b46af9-4185-47a3-92c1-e852f2d54189",
+      "name": "Assistant Request Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -704,
+        816
+      ],
+      "webhookId": "880c543f-0794-4ad9-9470-a1b821944ddc"
+    },
+    {
+      "parameters": {
+        "url": "https://sheets.googleapis.com/v4/spreadsheets/1n5c7sFW9udP-l-4AzvKtDzN8Qon4RHcYPvKDUFrGRK0/values/Clients",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "95a3ddf2-8d95-474e-881a-e330270f9fa9",
+      "name": "Load Clients (Assistant)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -480,
+        816
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "m5CE0p2OCpQRSns3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Vapi asks: which assistant + business details for this incoming call?\nconst msg = ($('Assistant Request Webhook').first().json.body || {}).message || {};\nconst phoneId = (msg.phoneNumber && msg.phoneNumber.id) || (msg.call && msg.call.phoneNumberId) || '';\nconst vals = $input.first().json.values || [];\nconst [hdr = [], ...rows] = vals;\nconst list = rows.map(r => Object.fromEntries(hdr.map((k, j) => [String(k).trim(), String(r[j] ?? '').trim()])))\n  .filter(c => c.client_id && String(c.active || 'yes').toLowerCase() !== 'no');\nconst has = (f, v) => !!v && String(f || '').split(',').map(s => s.trim()).includes(v);\nconst c = list.find(x => has(x.phone_number_ids, phoneId)) || list[0];\nif (!c) return [{ json: { error: 'No active client configured' } }];\nreturn [{ json: {\n  assistantId: c.assistant_id,\n  assistantOverrides: { variableValues: {\n    business_name: c.business_name, city: c.city || '', agent_name: c.agent_name || 'Meerab',\n    timezone: c.timezone || 'Asia/Karachi', client_id: c.client_id } }\n} }];"
+      },
+      "id": "8247c270-e5d8-40eb-9c98-7a1fab6df660",
+      "name": "Pick Assistant & Business",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        816
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "efe6e87d-78cf-4e97-b156-c40c52660ead",
+      "name": "Respond To Vapi (Assistant)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -32,
+        816
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Vapi Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Tool Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Tool Call": {
+      "main": [
+        [
+          {
+            "node": "Load Clients (Pricing)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format For Vapi": {
+      "main": [
+        [
+          {
+            "node": "Respond To Vapi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Availability Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Availability Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Availability Call": {
+      "main": [
+        [
+          {
+            "node": "Load Clients (Availability)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Settings": {
+      "main": [
+        [
+          {
+            "node": "Services For Availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Services For Availability": {
+      "main": [
+        [
+          {
+            "node": "Packages For Availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Packages For Availability": {
+      "main": [
+        [
+          {
+            "node": "Get Day Bookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Day Bookings": {
+      "main": [
+        [
+          {
+            "node": "Compute Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Slots": {
+      "main": [
+        [
+          {
+            "node": "Respond Availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Booking Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Booking Call": {
+      "main": [
+        [
+          {
+            "node": "Load Clients (Booking)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Settings": {
+      "main": [
+        [
+          {
+            "node": "Booking Services",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Services": {
+      "main": [
+        [
+          {
+            "node": "Booking Packages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Packages": {
+      "main": [
+        [
+          {
+            "node": "Booking Day Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Day Events": {
+      "main": [
+        [
+          {
+            "node": "Validate Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Booking": {
+      "main": [
+        [
+          {
+            "node": "Slot OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slot OK?": {
+      "main": [
+        [
+          {
+            "node": "Create Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Not Booked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Build Booking Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Booking Row": {
+      "main": [
+        [
+          {
+            "node": "Save To Bookings Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save To Bookings Sheet": {
+      "main": [
+        [
+          {
+            "node": "Respond Booked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond Booked": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Owner",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Email Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalation Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Escalation Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Escalation Call": {
+      "main": [
+        [
+          {
+            "node": "Load Clients (Escalation)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalation Settings": {
+      "main": [
+        [
+          {
+            "node": "Build Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Escalation": {
+      "main": [
+        [
+          {
+            "node": "Respond Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond Escalation": {
+      "main": [
+        [
+          {
+            "node": "Escalation Row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "WhatsApp Callback Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Email Callback Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalation Row": {
+      "main": [
+        [
+          {
+            "node": "Log Callback Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Sheet Tabs": {
+      "main": [
+        [
+          {
+            "node": "Format For Vapi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Clients (Pricing)": {
+      "main": [
+        [
+          {
+            "node": "Client (Pricing)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Client (Pricing)": {
+      "main": [
+        [
+          {
+            "node": "Read Sheet Tabs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Clients (Availability)": {
+      "main": [
+        [
+          {
+            "node": "Client (Availability)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Client (Availability)": {
+      "main": [
+        [
+          {
+            "node": "Read Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Clients (Booking)": {
+      "main": [
+        [
+          {
+            "node": "Client (Booking)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Client (Booking)": {
+      "main": [
+        [
+          {
+            "node": "Booking Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Clients (Escalation)": {
+      "main": [
+        [
+          {
+            "node": "Client (Escalation)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Client (Escalation)": {
+      "main": [
+        [
+          {
+            "node": "Escalation Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assistant Request Webhook": {
+      "main": [
+        [
+          {
+            "node": "Load Clients (Assistant)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Clients (Assistant)": {
+      "main": [
+        [
+          {
+            "node": "Pick Assistant & Business",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Assistant & Business": {
+      "main": [
+        [
+          {
+            "node": "Respond To Vapi (Assistant)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "errorWorkflow": "LmVv5wXgTV04tiQK",
+    "timeSavedPerExecution": 2
+  },
+  "versionId": "42ae8de9-86b2-4e36-8011-ea647283c151",
+  "meta": {
+    "instanceId": "193fe0c73bc4de84a18d8a3d7cb3987abe33a10af62adfbccb7b9d6cc5132a80"
+  },
+  "id": "fJwmnw0yo9iT4uWK",
+  "tags": []
+}
